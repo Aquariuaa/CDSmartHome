@@ -1,1 +1,63 @@
+import torch
+import torch.nn.functional as F
+from collections import deque
 
+# Spatiotemporal-aware Robust Hawkes Process
+def find_k_hop_neighbors(adj_matr, k):
+    n = len(adj_matr)
+    neighbors = {i: [i] for i in range(n)}
+    for node in range(n):
+        visited = [False] * n
+        visited[node] = True
+        queue = deque([(node, 0)])
+        while queue:
+            cur, dist = queue.popleft()
+            if dist >= k:
+                continue
+            for nb in range(n):
+                if adj_matr[cur][nb] and not visited[nb]:
+                    visited[nb] = True
+                    neighbors[node].append(nb)
+                    queue.append((nb, dist + 1))
+    return neighbors
+
+def build_masks(seqs, nei_seqs, event_n, tau_max=300):
+    mask_len = sum(s.shape[0] for s in seqs)
+    A_mask = torch.zeros((mask_len, event_n, event_n))
+    mu_mask = torch.zeros((mask_len, event_n))
+    A_mask_int = torch.zeros((event_n, event_n))
+    mu_mask_int = torch.ones(event_n) * max(s[-1,2] if s.numel() else 0 for s in seqs)
+
+    cnt = 0
+    for seq, nei in zip(seqs, nei_seqs):
+        if seq.numel() == 0:
+            continue
+        for e in range(seq.shape[0]):
+            t = seq[e, 1]
+            valid = (nei[:,1] < t) & (nei[:,2] > t) & (nei[:,1] >= t - tau_max)
+            g = nei[valid, 0].to(torch.int64)
+            A_mask[cnt, :, seq[e,0].to(torch.int64)] = torch.bincount(g, minlength=event_n)
+            mu_mask[cnt, seq[e,0].to(torch.int64)] = 1
+            cnt += 1
+        for ev in nei:
+            dur = min((ev[2] - ev[1]).item(), tau_max)
+            A_mask_int[ev[0].to(torch.int64), :] += dur
+    return A_mask, mu_mask, A_mask_int, mu_mask_int
+
+# 2. Inverse Probability Weighting Loss Function
+def ipw_likelihood(A, mu, A_mask, mu_mask, A_int, mu_int, prior_mask, pi):
+    A_eff = (F.softplus(A) / pi) * prior_mask
+    mu_eff = F.softplus(mu)
+    term1 = torch.sum(torch.log(
+        torch.sum(A_eff.unsqueeze(0) * A_mask, dim=(1,2)) +
+        torch.sum(mu_eff.unsqueeze(0) * mu_mask, dim=1) + 1e-9))
+    term2 = torch.sum(mu_eff * mu_int)
+    term3 = torch.sum(A_eff * A_int)
+    return term1 - term2 - term3
+
+
+def loss_fn(A, mu, masks, prior_mask, n, pi, lambda1, lambda21, lambda2):
+    L = ipw_likelihood(A, mu, *masks, prior_mask, pi)
+    reg = lambda1 * torch.norm(F.softplus(A), p=1) + lambda21 * l21_norm(A)
+    dag = lambda2 * dag_constraint(A, prior_mask, n)
+    return -L + reg + dag
