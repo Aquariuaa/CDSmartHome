@@ -55,7 +55,7 @@ def ipw_likelihood(A, mu, A_mask, mu_mask, A_int, mu_int, prior_mask, pi):
     term3 = torch.sum(A_eff * A_int)
     return term1 - term2 - term3
 
-
+# 3. Final loss
 def loss_fn(A, mu, masks, prior_mask, n, pi, lambda1, lambda21, lambda2):
     L = ipw_likelihood(A, mu, *masks, prior_mask, pi)
     reg = lambda1 * torch.norm(F.softplus(A), p=1) + lambda21 * l21_norm(A)
