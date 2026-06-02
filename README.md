@@ -1,26 +1,26 @@
-> **Important Notice**: This repository contains **only the core implementation** for the anonymous review process.  
+> **Important Notice**: This repository contains **only the core implementation** for the review process.  
 > All data and the full code will be made publicly available after the review period.
 
 ## Method Overview
 
-This work addresses three major challenges in causal discovery from alarm event sequences in smart home environments:
+This work addresses three major challenges in causal discovery from alarm event sequences in WSNs:
 
 - **Noise Interference**
 - **Computational Efficiency**
-- **Human‑in‑the‑loop support**
 
 ## Datasets
 
 We evaluate the method on three datasets:
 
 - **Synthetic Datasets**
-- **Smart Home Alarm Dataset**
+- **WSNs Dataset**
 - **Real‑World Wireless Network Alarm Data**
 
 ## Evaluation Metrics
 
 - Precision, Recall, F1 Score
 - Structural Hamming Distance (SHD)
+- Wall-clock Execution Time, peak VRAM allocation
 
 ## Experimental Environment
 - Python 3.9.25
